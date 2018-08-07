@@ -172,7 +172,7 @@ type Build struct {
 // Spec holds all parameters related to a function's configuration
 type Spec struct {
 	Description             string                  `json:"description,omitempty"`
-	Disabled                bool                    `json:"disable,omitempty"`
+	Disabled                bool                    `json:"disabled,omitempty"`
 	Publish                 bool                    `json:"publish,omitempty"`
 	Handler                 string                  `json:"handler,omitempty"`
 	Runtime                 string                  `json:"runtime,omitempty"`
