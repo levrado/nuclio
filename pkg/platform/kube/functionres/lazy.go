@@ -123,6 +123,17 @@ func (lc *lazyClient) CreateOrUpdate(ctx context.Context, function *nuclioio.Fun
 	// get labels from the function and add class labels
 	labels := lc.getFunctionLabels(function)
 
+	// remove ingress and horizontal pod autoscaler associated with this function, if needed they'll be recreated
+	err = lc.deleteIngress(function.Namespace, function.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to delete ingress")
+	}
+
+	err = lc.deleteHorizontalPodAutoscaler(function.Namespace, function.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to delete HPA")
+	}
+
 	// set a few constants
 	labels["nuclio.io/function-name"] = function.Name
 
@@ -225,24 +236,14 @@ func (lc *lazyClient) Delete(ctx context.Context, namespace string, name string)
 		PropagationPolicy: &propogationPolicy,
 	}
 
-	// Delete ingress
-	err := lc.kubeClientSet.ExtensionsV1beta1().Ingresses(namespace).Delete(name, deleteOptions)
+	err := lc.deleteIngress(namespace, name)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return errors.Wrap(err, "Failed to delete ingress")
-		}
-	} else {
-		lc.logger.DebugWith("Deleted ingress", "namespace", namespace, "name", name)
+		return errors.Wrap(err, "Failed to delete ingress")
 	}
 
-	// Delete HPA if exists
-	err = lc.kubeClientSet.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(name, deleteOptions)
+	err = lc.deleteHorizontalPodAutoscaler(namespace, name)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return errors.Wrap(err, "Failed to delete HPA")
-		}
-	} else {
-		lc.logger.DebugWith("Deleted HPA", "namespace", namespace, "name", name)
+		return errors.Wrap(err, "Failed to delete HPA")
 	}
 
 	// Delete Service if exists
@@ -989,6 +990,42 @@ func (lc *lazyClient) getConfigurationVolumes(function *nuclioio.Function) []v1.
 		processorConfigVolume,
 		platformConfigVolume,
 	}
+}
+
+func (lc *lazyClient) deleteIngress(namespace string, name string) error {
+	propogationPolicy := meta_v1.DeletePropagationForeground
+	deleteOptions := &meta_v1.DeleteOptions{
+		PropagationPolicy: &propogationPolicy,
+	}
+
+	// Delete ingress if exists
+	err := lc.kubeClientSet.ExtensionsV1beta1().Ingresses(namespace).Delete(name, deleteOptions)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrap(err, "Failed to delete ingress")
+		}
+	} else {
+		lc.logger.DebugWith("Deleted ingress", "namespace", namespace, "name", name)
+	}
+	return nil
+}
+
+func (lc *lazyClient) deleteHorizontalPodAutoscaler(namespace string, name string) error {
+	propogationPolicy := meta_v1.DeletePropagationForeground
+	deleteOptions := &meta_v1.DeleteOptions{
+		PropagationPolicy: &propogationPolicy,
+	}
+
+	// Delete HPA if exists
+	err := lc.kubeClientSet.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(name, deleteOptions)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrap(err, "Failed to delete HPA")
+		}
+	} else {
+		lc.logger.DebugWith("Deleted HPA", "namespace", namespace, "name", name)
+	}
+	return nil
 }
 
 //
