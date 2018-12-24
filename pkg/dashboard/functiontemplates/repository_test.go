@@ -77,7 +77,8 @@ func (suite *repositoryTestSuite) TestFilteredGet() {
 
 	// verify that returned value holds function source
 	for functionTemplatesIdx, functionTemplate := range functionTemplates {
-		decodedSourceCode, err := base64.StdEncoding.DecodeString(matchedFunctionTemplates[functionTemplatesIdx].FunctionConfig.Spec.Build.FunctionSourceCode)
+		decodedSourceCode, err := base64.StdEncoding.DecodeString(
+			matchedFunctionTemplates[functionTemplatesIdx].Spec.FunctionConfig.Spec.Build.FunctionSourceCode)
 		suite.Require().NoError(err, "Failed to decode function source")
 		suite.Require().Equal(functionTemplate.SourceCode, string(decodedSourceCode))
 	}
@@ -85,12 +86,12 @@ func (suite *repositoryTestSuite) TestFilteredGet() {
 	// get, filtered by name. expect template2
 	matchedFunctionTemplates = repository.GetFunctionTemplates(&Filter{"template2"})
 	suite.Require().Len(matchedFunctionTemplates, 1)
-	suite.Require().Equal("template2", matchedFunctionTemplates[0].Name)
+	suite.Require().Equal("template2", matchedFunctionTemplates[0].Meta.Name)
 
 	// get, filtered by configuration. expect template1
 	matchedFunctionTemplates = repository.GetFunctionTemplates(&Filter{"template-1-"})
 	suite.Require().Len(matchedFunctionTemplates, 1)
-	suite.Require().Equal("template1", matchedFunctionTemplates[0].Name)
+	suite.Require().Equal("template1", matchedFunctionTemplates[0].Meta.Name)
 }
 
 func TestRepository(t *testing.T) {

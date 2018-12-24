@@ -22,17 +22,17 @@ type Filter struct {
 	Contains string
 }
 
-func (ftf *Filter) functionTemplatePasses(template *FunctionTemplate) bool {
+func (ftf *Filter) functionTemplatePasses(template *FunctionTemplateConfig) bool {
 	if ftf.empty() {
 		return true
 	}
 
 	stringsToSearch := []string{
-		template.Name,
+		template.Meta.Name,
 	}
 
-	if string(template.serializedTemplate) != "" {
-		stringsToSearch = append(stringsToSearch, string(template.serializedTemplate))
+	if string(template.Spec.serializedTemplate) != "" {
+		stringsToSearch = append(stringsToSearch, string(template.Spec.serializedTemplate))
 	}
 
 	for _, stringToSearch := range stringsToSearch {

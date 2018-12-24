@@ -18,14 +18,23 @@ package functiontemplates
 
 import "github.com/nuclio/nuclio/pkg/functionconfig"
 
-type FunctionTemplate struct {
-	Name                   string
-	DisplayName            string
-	SourceCode             string
-	FunctionConfigTemplate string
-	FunctionConfigValues   map[string]interface{}
-	FunctionConfig         *functionconfig.Config
-	serializedTemplate     []byte
+type FunctionTemplateConfig struct {
+	Meta Meta `json:"metadata,omitempty"`
+	Spec Spec `json:"spec,omitempty"`
+}
+
+type Meta struct {
+	Name        string `json:"name,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+}
+
+type Spec struct {
+	SourceCode           string                 `json:"sourceCode,omitempty"`
+	Template             string                 `json:"template,omitempty"`
+	FunctionConfigValues map[string]interface{} `json:"values,omitempty"`
+	FunctionConfig       *functionconfig.Config `json:"functionConfig,omitempty"`
+	Avatar               string                 `json:"avatar,omitempty"`
+	serializedTemplate   []byte
 }
 
 type generatedFunctionTemplate struct {

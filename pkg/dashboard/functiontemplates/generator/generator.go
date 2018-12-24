@@ -84,7 +84,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-var FunctionTemplates = []*FunctionTemplate{
+var FunctionTemplates = []*FunctionTemplateConfig{
 {{- range .FunctionTemplates }}
 	{
 		Name: "{{ generateUniqueName .Name }}",
@@ -191,8 +191,8 @@ func (g *Generator) detectFunctionDirs() ([]string, error) {
 	return functionDirs, nil
 }
 
-func (g *Generator) buildFunctionTemplates(functionDirs []string) ([]*functiontemplates.FunctionTemplate, error) {
-	var functionTemplates []*functiontemplates.FunctionTemplate
+func (g *Generator) buildFunctionTemplates(functionDirs []string) ([]*functiontemplates.FunctionTemplateConfig, error) {
+	var functionTemplates []*functiontemplates.FunctionTemplateConfig
 
 	g.logger.DebugWith("Building function templates", "numFunctions", len(functionDirs))
 
@@ -220,7 +220,7 @@ func (g *Generator) buildFunctionTemplates(functionDirs []string) ([]*functionte
 			continue
 		}
 
-		functionTemplate := functiontemplates.FunctionTemplate{
+		functionTemplate := functiontemplates.FunctionTemplateConfig{
 			Configuration: *configuration,
 			Name:          functionName,
 			SourceCode:    sourceCode,
@@ -351,7 +351,7 @@ func (g *Generator) parseInlineConfiguration(sourcePath string,
 	return nil
 }
 
-func (g *Generator) writeOutputFile(functionTemplates []*functiontemplates.FunctionTemplate) error {
+func (g *Generator) writeOutputFile(functionTemplates []*functiontemplates.FunctionTemplateConfig) error {
 	g.logger.DebugWith("Writing output file", "path", g.outputPath, "numFunctions", len(functionTemplates))
 
 	outputFile, err := os.Create(g.outputPath)
@@ -366,7 +366,7 @@ func (g *Generator) writeOutputFile(functionTemplates []*functiontemplates.Funct
 	}()
 
 	err = packageTemplate.Execute(outputFile, struct {
-		FunctionTemplates  []*functiontemplates.FunctionTemplate
+		FunctionTemplates  []*functiontemplates.FunctionTemplateConfig
 		FunctionsByRuntime map[string][]string
 	}{
 		FunctionTemplates:  functionTemplates,

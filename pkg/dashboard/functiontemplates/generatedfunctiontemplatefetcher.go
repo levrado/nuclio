@@ -27,7 +27,7 @@ import (
 
 type GeneratedFunctionTemplateFetcher struct {
 	logger            logger.Logger
-	functionTemplates []*FunctionTemplate
+	functionTemplates []*FunctionTemplateConfig
 }
 
 func NewGeneratedFunctionTemplateFetcher(parentLogger logger.Logger) (*GeneratedFunctionTemplateFetcher, error) {
@@ -65,25 +65,31 @@ func (gftf *GeneratedFunctionTemplateFetcher) SetGeneratedFunctionTemplates(gene
 	return nil
 }
 
-func (gftf *GeneratedFunctionTemplateFetcher) Fetch() ([]*FunctionTemplate, error) {
-	var returnFunctionTemplates []*FunctionTemplate
+func (gftf *GeneratedFunctionTemplateFetcher) Fetch() ([]*FunctionTemplateConfig, error) {
+	var returnFunctionTemplates []*FunctionTemplateConfig
 	for functionTemplateIndex := 0; functionTemplateIndex < len(gftf.functionTemplates); functionTemplateIndex++ {
 		returnFunctionTemplates = append(returnFunctionTemplates, gftf.functionTemplates[functionTemplateIndex])
 	}
 	return returnFunctionTemplates, nil
 }
 
-func (gftf *GeneratedFunctionTemplateFetcher) generatedFunctionTemplatesToFunctionTemplates(generatedFunctionTemplates []*generatedFunctionTemplate) ([]*FunctionTemplate, error) {
-	functionTemplates := make([]*FunctionTemplate, len(generatedFunctionTemplates))
+func (gftf *GeneratedFunctionTemplateFetcher) generatedFunctionTemplatesToFunctionTemplates(generatedFunctionTemplates []*generatedFunctionTemplate) ([]*FunctionTemplateConfig, error) {
+	functionTemplates := make([]*FunctionTemplateConfig, len(generatedFunctionTemplates))
 	for generatedFunctionTemplateIndex := 0; generatedFunctionTemplateIndex < len(generatedFunctionTemplates); generatedFunctionTemplateIndex++ {
-		functionTemplates[generatedFunctionTemplateIndex] = &FunctionTemplate{
-			SourceCode:             generatedFunctionTemplates[generatedFunctionTemplateIndex].SourceCode,
-			Name:                   generatedFunctionTemplates[generatedFunctionTemplateIndex].Name,
-			FunctionConfig:         &generatedFunctionTemplates[generatedFunctionTemplateIndex].Configuration,
-			DisplayName:            generatedFunctionTemplates[generatedFunctionTemplateIndex].DisplayName,
-			serializedTemplate:     generatedFunctionTemplates[generatedFunctionTemplateIndex].serializedTemplate,
-			FunctionConfigValues:   map[string]interface{}{},
-			FunctionConfigTemplate: "",
+		functionTemplates[generatedFunctionTemplateIndex] = &FunctionTemplateConfig{
+			Meta: Meta{
+				Name:        generatedFunctionTemplates[generatedFunctionTemplateIndex].Name,
+				DisplayName: generatedFunctionTemplates[generatedFunctionTemplateIndex].DisplayName,
+			},
+			Spec: Spec{
+				SourceCode: generatedFunctionTemplates[generatedFunctionTemplateIndex].SourceCode,
+
+				FunctionConfig: &generatedFunctionTemplates[generatedFunctionTemplateIndex].Configuration,
+
+				serializedTemplate:   generatedFunctionTemplates[generatedFunctionTemplateIndex].serializedTemplate,
+				FunctionConfigValues: map[string]interface{}{},
+				Template:             "",
+			},
 		}
 	}
 

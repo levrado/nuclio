@@ -24,11 +24,11 @@ import (
 
 type Repository struct {
 	logger            logger.Logger
-	functionTemplates []*FunctionTemplate
+	functionTemplates []*FunctionTemplateConfig
 }
 
 func NewRepository(parentLogger logger.Logger, fetchers []FunctionTemplateFetcher) (*Repository, error) {
-	var templates []*FunctionTemplate
+	var templates []*FunctionTemplateConfig
 
 	for _, fetcher := range fetchers {
 		currentFetcherTemplates, err := fetcher.Fetch()
@@ -49,8 +49,8 @@ func NewRepository(parentLogger logger.Logger, fetchers []FunctionTemplateFetche
 	return newRepository, nil
 }
 
-func (r *Repository) GetFunctionTemplates(filter *Filter) []*FunctionTemplate {
-	var passingFunctionTemplates []*FunctionTemplate
+func (r *Repository) GetFunctionTemplates(filter *Filter) []*FunctionTemplateConfig {
+	var passingFunctionTemplates []*FunctionTemplateConfig
 
 	for _, functionTemplate := range r.functionTemplates {
 		if filter == nil || filter.functionTemplatePasses(functionTemplate) {

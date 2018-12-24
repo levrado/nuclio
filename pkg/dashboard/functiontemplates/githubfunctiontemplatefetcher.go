@@ -64,8 +64,8 @@ func NewGithubFunctionTemplateFetcher(parentLogger logger.Logger,
 	}, nil
 }
 
-func (gftf *GithubFunctionTemplateFetcher) Fetch() ([]*FunctionTemplate, error) {
-	var functionTemplates []*FunctionTemplate
+func (gftf *GithubFunctionTemplateFetcher) Fetch() ([]*FunctionTemplateConfig, error) {
+	var functionTemplates []*FunctionTemplateConfig
 
 	gftf.logger.DebugWith("Fetching templates from github",
 		"owner",
@@ -104,8 +104,8 @@ func getOAuthClient(githubAccessToken string) (*http.Client, error) {
 	return oauth2.NewClient(context.TODO(), tokenSource), nil
 }
 
-func (gftf *GithubFunctionTemplateFetcher) getTemplatesFromGithubSHA(treeSha string, upperDirName string) ([]*FunctionTemplate, error) {
-	var functionTemplates []*FunctionTemplate
+func (gftf *GithubFunctionTemplateFetcher) getTemplatesFromGithubSHA(treeSha string, upperDirName string) ([]*FunctionTemplateConfig, error) {
+	var functionTemplates []*FunctionTemplateConfig
 
 	// get subdir items from github sha
 	// recursive set to false because when set to true it may not give all items in dir (https://developer.github.com/v3/git/trees/#get-a-tree-recursively)
@@ -141,14 +141,14 @@ func (gftf *GithubFunctionTemplateFetcher) getTemplatesFromGithubSHA(treeSha str
 	return functionTemplates, nil
 }
 
-func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeEntry, upperDirName string) (*FunctionTemplate, error) {
-	currentDirFunctionTemplate := FunctionTemplate{}
+func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeEntry, upperDirName string) (*FunctionTemplateConfig, error) {
+	currentDirFunctionTemplate := FunctionTemplateConfig{}
 
 	// add dir name as function's Name
-	currentDirFunctionTemplate.Name = upperDirName
+	currentDirFunctionTemplate.Meta.Name = upperDirName
 
 	if sourceFile, err := gftf.getFirstSourceFile(dir); sourceFile != nil {
-		currentDirFunctionTemplate.SourceCode = *sourceFile
+		currentDirFunctionTemplate.Spec.SourceCode = *sourceFile
 	} else if err != nil {
 		return nil, errors.Wrap(err, "Failed to get and process source file")
 	}
@@ -161,7 +161,7 @@ func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeE
 
 	// if we got functionconfig we're done
 	if file != nil {
-		err = yaml.Unmarshal([]byte(*file), &currentDirFunctionTemplate.FunctionConfig)
+		err = yaml.Unmarshal([]byte(*file), &currentDirFunctionTemplate.Spec.FunctionConfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to unmarshall yaml file function.yaml")
 		}
@@ -171,19 +171,21 @@ func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeE
 	}
 
 	// get function.yaml.template - error if failed to get its content although it exists
-	yamlTemplateFile, yamlValuesFile, err := gftf.getFunctionYAMLTemplateAndValuesFromTreeEntries(dir)
+	yamlTemplateFile, yamlValuesFile, avatar, err := gftf.getFunctionArtifactsFromTreeEntries(dir)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "Found function.yaml.template yaml file or "+
 			"function.yaml.values yaml file but failed to get its content")
 	}
 
-	// if one is set both are set - else getFunctionYAMLTemplateAndValuesFromTreeEntries would have raise an error
-	if yamlTemplateFile != nil {
-		currentDirFunctionTemplate.FunctionConfigTemplate = *yamlTemplateFile
+	currentDirFunctionTemplate.Spec.Avatar = avatar
+
+	// if one is set both are set - else getFunctionArtifactsFromTreeEntries would have raise an error
+	if yamlTemplateFile != "" {
+		currentDirFunctionTemplate.Spec.Template = yamlTemplateFile
 
 		var values map[string]interface{}
-		err := yaml.Unmarshal([]byte(*yamlValuesFile), &values)
+		err := yaml.Unmarshal([]byte(yamlValuesFile), &values)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to unmarshall function template's values file")
 		}
@@ -191,9 +193,9 @@ func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeE
 		for valueName, valueInterface := range values {
 			values[valueName] = dyno.ConvertMapI2MapS(valueInterface)
 		}
-		currentDirFunctionTemplate.FunctionConfigValues = values
+		currentDirFunctionTemplate.Spec.FunctionConfigValues = values
 
-		currentDirFunctionTemplate.FunctionConfig = &functionconfig.Config{}
+		currentDirFunctionTemplate.Spec.FunctionConfig = &functionconfig.Config{}
 
 		gftf.replaceSourceCodeInTemplate(&currentDirFunctionTemplate)
 		gftf.enrichFunctionTemplate(&currentDirFunctionTemplate)
@@ -206,24 +208,42 @@ func (gftf *GithubFunctionTemplateFetcher) getTemplateFromDir(dir []github.TreeE
 	return nil, nil
 }
 
-func (gftf *GithubFunctionTemplateFetcher) getFunctionYAMLTemplateAndValuesFromTreeEntries(dir []github.TreeEntry) (*string, *string, error) {
+func (gftf *GithubFunctionTemplateFetcher) getFunctionArtifactsFromTreeEntries(dir []github.TreeEntry) (string, string, string, error) {
+	var avatar, template, values string
+
 	yamlTemplate, err := gftf.getFileFromTreeEntries(dir, "function.yaml.template")
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Failed to get function.yaml.template")
+		return "", "", "", errors.Wrap(err, "Failed to get function.yaml.template")
 	}
 	gftf.logger.DebugWith("Got function template directory structure from github", "dir", dir)
 
 	yamlValuesFile, err := gftf.getFileFromTreeEntries(dir, "function.yaml.values")
-
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Found function.yaml.values yaml file but failed to get its content")
+		return "", "", "", errors.Wrap(err, "Found function.yaml.values yaml file but failed to get its contents")
 	}
 
 	if (yamlTemplate == nil) != (yamlValuesFile == nil) {
-		return nil, nil, errors.New("Could found only one file out of function.yaml.value & function.yaml.template")
+		return "", "", "", errors.New("Could found only one file out of function.yaml.value & function.yaml.template")
 	}
 
-	return yamlTemplate, yamlValuesFile, nil
+	avatarFile, err := gftf.getFileFromTreeEntries(dir, "avatar.jpeg")
+	if err != nil {
+		return "", "", "", errors.Wrap(err, "Found avatar file but failed to get its contents")
+	}
+
+	if avatarFile != nil {
+		avatar = base64.StdEncoding.EncodeToString([]byte(*avatarFile))
+	}
+
+	if yamlTemplate != nil {
+		template = *yamlTemplate
+	}
+
+	if yamlValuesFile != nil {
+		values = *yamlValuesFile
+	}
+
+	return template, values, avatar, nil
 }
 
 func (gftf *GithubFunctionTemplateFetcher) getSourceTreeSha() (string, error) {
@@ -278,26 +298,26 @@ func (gftf *GithubFunctionTemplateFetcher) getFileFromTreeEntries(entries []gith
 	return nil, nil
 }
 
-func (gftf *GithubFunctionTemplateFetcher) replaceSourceCodeInTemplate(functionTemplate *FunctionTemplate) {
+func (gftf *GithubFunctionTemplateFetcher) replaceSourceCodeInTemplate(functionTemplate *FunctionTemplateConfig) {
 
 	// hack: if template writer passed a function source code, reflect it in template by replacing `functionSourceCode: {{ .SourceCode }}`
 	replacement := fmt.Sprintf("functionSourceCode: %s",
-		base64.StdEncoding.EncodeToString([]byte(functionTemplate.SourceCode)))
+		base64.StdEncoding.EncodeToString([]byte(functionTemplate.Spec.SourceCode)))
 	pattern := "functionSourceCode: {{ .SourceCode }}"
-	functionTemplate.FunctionConfigTemplate = strings.Replace(functionTemplate.FunctionConfigTemplate,
+	functionTemplate.Spec.Template = strings.Replace(functionTemplate.Spec.Template,
 		pattern,
 		replacement,
 		1)
 }
 
-func (gftf *GithubFunctionTemplateFetcher) enrichFunctionTemplate(functionTemplate *FunctionTemplate) {
+func (gftf *GithubFunctionTemplateFetcher) enrichFunctionTemplate(functionTemplate *FunctionTemplateConfig) {
 
 	// set the source code we got earlier
-	functionTemplate.FunctionConfig.Spec.Build.FunctionSourceCode = base64.StdEncoding.EncodeToString(
-		[]byte(functionTemplate.SourceCode))
+	functionTemplate.Spec.FunctionConfig.Spec.Build.FunctionSourceCode = base64.StdEncoding.EncodeToString(
+		[]byte(functionTemplate.Spec.SourceCode))
 
 	// set something unique, the UI will ignore everything after `:`, this is par to pre-generated templates
-	functionTemplate.FunctionConfig.Meta = functionconfig.Meta{
-		Name: functionTemplate.Name + ":" + xid.New().String(),
+	functionTemplate.Meta = Meta{
+		Name: functionTemplate.Meta.Name + ":" + xid.New().String(),
 	}
 }

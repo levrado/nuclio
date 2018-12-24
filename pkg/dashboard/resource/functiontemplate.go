@@ -57,21 +57,22 @@ func (ftr *functionTemplateResource) GetAll(request *http.Request) (map[string]r
 	for _, matchingFunctionTemplate := range matchingFunctionTemplates {
 
 		// if not rendered, add template in "values" mode, else just add as functionConfig with Meta and Spec
-		if matchingFunctionTemplate.FunctionConfigTemplate != "" {
+		if matchingFunctionTemplate.Spec.Template != "" {
 
-			attributes[matchingFunctionTemplate.FunctionConfig.Meta.Name] = restful.Attributes{
-				"metadata": matchingFunctionTemplate.FunctionConfig.Meta,
-				"template": matchingFunctionTemplate.FunctionConfigTemplate,
-				"values":   matchingFunctionTemplate.FunctionConfigValues,
+			attributes[matchingFunctionTemplate.Meta.Name] = restful.Attributes{
+				"metadata": matchingFunctionTemplate.Meta,
+				"spec":     matchingFunctionTemplate.Spec,
 			}
 		} else {
 			renderedValues := make(map[string]interface{})
-			renderedValues["metadata"] = matchingFunctionTemplate.FunctionConfig.Meta
-			renderedValues["spec"] = matchingFunctionTemplate.FunctionConfig.Spec
+			renderedValues["metadata"] = matchingFunctionTemplate.Spec.FunctionConfig.Meta
+			renderedValues["spec"] = matchingFunctionTemplate.Spec.FunctionConfig.Spec
 
 			// add to attributes
-			attributes[matchingFunctionTemplate.FunctionConfig.Meta.Name] = restful.Attributes{
+			attributes[matchingFunctionTemplate.Meta.Name] = restful.Attributes{
 				"rendered": renderedValues,
+				"metadata": matchingFunctionTemplate.Meta,
+				"spec":     matchingFunctionTemplate.Spec,
 			}
 		}
 	}
