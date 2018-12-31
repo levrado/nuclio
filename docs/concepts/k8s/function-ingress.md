@@ -13,8 +13,6 @@ If you followed the [Getting Started with Nuclio on Kubernetes](/docs/setup/k8s/
 
 This means that an underlying HTTP client calls `http://<your cluster IP>:<some unique port>`. You can try this out yourself: first, find out the NodePort assigned to your function, by using the `nuctl get function` command of the `nuctl` CLI or the `kubectl get svc` command of the Kubernetes CLI. Then, use curl to send an HTTP request to this port.
 
-In addition to configuring a service, Nuclio creates a [Kubernetes ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) for your function's HTTP trigger, with the path specified as `<function name>/latest`. However, without an ingress controller running on your cluster, this will have no effect. An Ingress controller will listen for changed ingresses and reconfigure some type of reverse proxy to route requests based on rules specified in the ingress.
-
 ## Setting up an ingress controller
 
 In this guide, you'll set up a [Træfik](https://docs.traefik.io/) controller, but any type of Kubernetes ingress controller should work. You can read [Træfik's excellent documentation](https://docs.traefik.io/user-guide/kubernetes/), but for the purposes of this guide you can simply run the following commands to set up the controller:
@@ -44,20 +42,9 @@ Run the following command to deploy the sample `helloworld` function; (the comma
 nuctl deploy -p https://raw.githubusercontent.com/nuclio/nuclio/master/hack/examples/golang/helloworld/helloworld.go --registry $(minikube ip):5000 helloworld --run-registry localhost:5000
 ```
 
-And now, invoke the function by its path.
-Replace `<NodePort>` with the NodePort of your ingress controller, and replace `${minikube ip)` with your cluster IP if you are not using Minikube:
-```sh
-curl $(minikube ip):<NodePort>/helloworld/latest
-```
+## Setting function ingress
 
-For example, for NodePort 30019, run this command:
-```sh
-curl $(minikube ip):30019/helloworld/latest
-```
-
-## Customizing function ingress
-
-By default, functions initialize the HTTP trigger and register `<function name>/latest`. However, you might want to add paths for functions to organize them in namespaces/groups, or even choose through which domain your functions can be triggered. To do this, you can configure your HTTP trigger in the [function's configuration](/docs/reference/function-configuration/function-configuration-reference.md). For example:
+To add paths for functions to organize them in namespaces/groups, or even choose through which domain your functions can be triggered. To do this, you can configure your HTTP trigger in the [function's configuration](/docs/reference/function-configuration/function-configuration-reference.md). For example:
 
 ```yaml
   ...
@@ -81,8 +68,6 @@ By default, functions initialize the HTTP trigger and register `<function name>/
 
 If your `helloworld` function was configured in this way, and assuming that Træfik's NodePort is 30019, the function would be accessible through any of the following URLs:
 
-- `<cluster ip>:30019/helloworld/latest`
-- `some.host.com:30019/helloworld/latest`
 - `some.host.com:30019/first/path`
 - `some.host.com:30019/second/path`
 - `<cluster ip>:30019/wat`
@@ -132,7 +117,6 @@ nuctl deploy -p https://raw.githubusercontent.com/nuclio/nuclio/master/hack/exam
 Behind the scenes, `nuctl` populates a function CR, which is picked up by the Nuclio `controller`. The `controller` iterates through all the triggers and looks for the required ingresses. For each ingress, the controller creates a Kubernetes Ingress object, which triggers the Træfik ingress controller to reconfigure the reverse proxy. Following are sample `controller` logs:
 
 ```
-controller.functiondep (D) Adding ingress {"function": "helloworld", "host": "", "paths": ["/helloworld/latest"]}
 controller.functiondep (D) Adding ingress {"function": "helloworld", "host": "my.host.com", "paths": ["/first/from/host"]}
 controller.functiondep (D) Adding ingress {"function": "helloworld", "host": "", "paths": ["/first/path", "/second/path"]
 ```
@@ -169,9 +153,6 @@ Now, do some invocations with curl. The following examples assume the use of Min
 > Note: The parenthesized "works" and error indications at the end of each line signify the expected outcome and are not part of the command.
 
 ```sh
-curl $(minikube ip):30019/ingress/latest (works)
-curl my.host.com:30019/ingress/latest (works)
-
 curl $(minikube ip):30019/first/path (works)
 curl my.host.com:30019/first/path (works)
 
